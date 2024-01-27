@@ -11,6 +11,7 @@ namespace Tetris
             this.GameGrid = new GameGrid(22, 10);
             this.BlockQueue = new BlockQueue();
             this.CurrentBlock = this.BlockQueue.GetAndUpdate();
+            this.CanHold = true;
         }
 
         public Block CurrentBlock
@@ -20,6 +21,16 @@ namespace Tetris
             {
                 this.currentBlock = value;
                 this.currentBlock.Reset();
+
+                for (int i = 0; i < 2; i++)
+                {
+                    this.currentBlock.Move(1, 0);
+
+                    if (!BlockFits())
+                    {
+                        this.currentBlock.Move(-1, 0);
+                    }
+                }
             }
         }
 
@@ -28,6 +39,12 @@ namespace Tetris
         public BlockQueue BlockQueue { get; }
 
         public bool GameOver { get; private set; }
+
+        public int Score { get; private set; }
+
+        public Block HeldBlock { get; private set; }
+
+        public bool CanHold { get; private set; }
 
         public void RotateBlockCW()
         {
@@ -39,7 +56,7 @@ namespace Tetris
             }
         }
 
-        public void RotateCCW()
+        public void RotateBlockCCW()
         {
             this.CurrentBlock.RotateCCW();
 
@@ -80,6 +97,47 @@ namespace Tetris
             }
         }
 
+        public void HoldBlock()
+        {
+            if (!this.CanHold)
+            {
+                return;
+            }
+
+            if (this.HeldBlock == null)
+            {
+                this.HeldBlock = this.CurrentBlock;
+                this.CurrentBlock = this.BlockQueue.GetAndUpdate();
+            }
+            else 
+            {
+                var temp = this.CurrentBlock;
+                this.CurrentBlock = this.HeldBlock;
+                this.HeldBlock = temp;
+            }
+
+            this.CanHold = false;
+        }
+
+        public void DropBlock()
+        {
+            this.CurrentBlock.Move(BlockDropDistance(), 0);
+            PlaceBlock();
+        }
+
+        public int BlockDropDistance()
+        {
+            var drop = this.GameGrid.Rows;
+
+            foreach (var position in this.CurrentBlock.TilePositons())
+            {
+                drop = Math.Min(drop, TileDropDistance(position));
+            }
+
+            return drop;
+
+        }
+
         private bool BlockFits()
         { 
             foreach (var position in this.CurrentBlock.TilePositons()) 
@@ -105,7 +163,7 @@ namespace Tetris
                 this.GameGrid[position.Row, position.Column] = this.CurrentBlock.Id;
             }
 
-            this.GameGrid.ClearFullRows();
+            this.Score += this.GameGrid.ClearFullRows();
 
             if (IsGameOver())
             {
@@ -114,7 +172,20 @@ namespace Tetris
             else 
             {
                 this.CurrentBlock = this.BlockQueue.GetAndUpdate();
+                this.CanHold = true;
             }
+        }
+
+        private int TileDropDistance(Position position)
+        {
+            var drop = 0;
+
+            while (this.GameGrid.IsEmpty(position.Row + drop + 1, position.Column)) 
+            {
+                drop++;
+            }
+
+            return drop;
         }
     }
 }
